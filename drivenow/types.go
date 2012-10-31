@@ -1,11 +1,16 @@
 package drivenow
 
+import (
+	"time"
+)
+
 type Vehicle struct {
-	Name         string   `json:"carName"`
-	Fuel         int      `json:"fuelState,string"`
-	Cleanliness  string   `json:"innerCleanliness"`
-	LicensePlate string   `json:"licensePlate"`
-	Position     Position `json:"position"`
+	Name         string    `json:"carName"`
+	Timestamp    time.Time `json:"timestamp"`
+	Fuel         int       `json:"fuelState,string"`
+	Cleanliness  string    `json:"innerCleanliness"`
+	LicensePlate string    `json:"licensePlate"`
+	Position     Position  `json:"position"`
 }
 
 type Position struct {

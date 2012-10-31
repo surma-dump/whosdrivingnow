@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/voxelbrain/goptions"
-	// "labix.org/v2/mgo"
 	"./drivenow"
 	"encoding/json"
+	"github.com/voxelbrain/goptions"
+	"labix.org/v2/mgo"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,9 +15,13 @@ import (
 
 var (
 	options = struct {
-		RawFolder string `goptions:"-r, --raw, obligatory, description='Path to the folder containing the raws'"`
-		Dry       bool   `goptions:"-n, --dry-run, description='Dont actually work on the database'"`
-	}{}
+		RawFolder string        `goptions:"-r, --raw, obligatory, description='Path to the folder containing the raws'"`
+		Dry       bool          `goptions:"-n, --dry-run, description='Dont actually work on the database'"`
+		MongoURL  *url.URL      `goptions:"-m, --mongodb, description='URL pointing to MongoDB'"`
+		Help      goptions.Help `goptions:"-h, --help, description='Show this help'"`
+	}{
+		MongoURL: MustURL(url.Parse("mongodb://localhost")),
+	}
 )
 
 func init() {
@@ -24,6 +29,15 @@ func init() {
 }
 
 func main() {
+	var collection *mgo.Collection
+	if !options.Dry {
+		session, err := mgo.Dial(options.MongoURL.String())
+		if err != nil {
+			log.Fatalf("Could not connect to %s: %s", options.MongoURL.String(), err)
+		}
+		defer session.Close()
+		collection = session.DB("").C("raw")
+	}
 	filepath.Walk(options.RawFolder, func(path string, fi os.FileInfo, err error) error {
 		if fi.IsDir() {
 			return nil
@@ -61,7 +75,24 @@ func main() {
 			log.Printf("Invalid content in %s: %s", path, err)
 			return nil
 		}
-		log.Printf("%s", timestamp)
+		log.Printf("Adding %4d entries of %s", len(container.Rec.Vehicles.Vehicles), timestamp)
+		for i, v := range container.Rec.Vehicles.Vehicles {
+			v.Timestamp = timestamp
+			if !options.Dry {
+				err := collection.Insert(v)
+				if err != nil {
+					log.Printf("Inserting %4d failed: %s", i, err)
+					continue
+				}
+			}
+		}
 		return nil
 	})
+}
+
+func MustURL(u *url.URL, err error) *url.URL {
+	if err != nil {
+		panic(err)
+	}
+	return u
 }
